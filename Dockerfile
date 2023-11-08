@@ -1,5 +1,5 @@
-ARG ALPINE_VERSION=3.16
-ARG LLVM_VERSION=16.0.0
+ARG ALPINE_VERSION=3.18.4
+ARG LLVM_VERSION=17.0.4
 ARG PARALLEL_LINK=4
 ARG INSTALL_PREFIX=/usr/local
 ARG LLVM_INSTALL_PATH=${INSTALL_PREFIX}/lib/llvm
@@ -7,7 +7,7 @@ ARG LLVM_INSTALL_PATH=${INSTALL_PREFIX}/lib/llvm
 FROM alpine:${ALPINE_VERSION} AS builder
 
 # install prerequisites
-RUN apk add --no-cache build-base cmake curl git libexecinfo-dev linux-headers ninja python3 wget zlib-dev
+RUN apk add --no-cache build-base cmake curl git linux-headers ninja python3 wget zlib-dev
 
 # download sources
 ARG LLVM_VERSION
@@ -71,9 +71,9 @@ RUN cd ${LLVM_SRC_DIR}/ \
 
 # build and link clang+lld with llvm toolchain
 # NOTE link jobs with LTO can use more than 10GB each!
-# NOTE: libexecinfo is needed for lldb and compiler-rt:fuzzer/sanitizer/profiler 
+# NOTE: DCOMPILER_RT_BUILD_GWP_ASAN=OFF is needed to avoid depending on libexecinfo
 ARG LLVM_INSTALL_PATH
-ARG LDFLAGS="-rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ -L/usr/local/lib -lexecinfo -Wno-unused-command-line-argument"
+ARG LDFLAGS="-rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ -L/usr/local/lib -Wno-unused-command-line-argument"
 RUN cd ${LLVM_SRC_DIR}/ \
     && cmake -B./build -H./llvm -DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja \
         -DCMAKE_C_COMPILER=clang \
@@ -96,6 +96,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DLLVM_ENABLE_ZLIB=ON \
         -DCOMPILER_RT_BUILD_BUILTINS=ON \
         -DCOMPILER_RT_BUILD_CRT=ON \
+        -DCOMPILER_RT_BUILD_GWP_ASAN=OFF \
         -DCOMPILER_RT_BUILD_XRAY=OFF \
         -DCOMPILER_RT_BUILD_MEMPROF=OFF \
         -DCOMPILER_RT_BUILD_ORC=OFF \
@@ -104,6 +105,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DLIBUNWIND_USE_COMPILER_RT=ON \
         -DLIBCXXABI_USE_COMPILER_RT=ON \
         -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
+        -DLIBCXX_HAS_ATOMIC_LIB=OFF \
         -DLIBCXX_HAS_MUSL_LIBC=ON \
         -DLIBCXX_USE_COMPILER_RT=ON \
         -DCLANG_DEFAULT_LINKER=lld \
@@ -161,7 +163,7 @@ RUN mkdir -p ${INSTALL_PREFIX}/lib ${INSTALL_PREFIX}/bin ${INSTALL_PREFIX}/inclu
     && ln -s ${LLVM_INSTALL_PATH}/bin/*       ${INSTALL_PREFIX}/bin/ \
     && ln -s ${LLVM_INSTALL_PATH}/lib/*       ${INSTALL_PREFIX}/lib/ \
     && ln -s ${LLVM_INSTALL_PATH}/include/c++ ${INSTALL_PREFIX}/include/
-RUN apk add --no-cache binutils libexecinfo linux-headers musl-dev zlib
+RUN apk add --no-cache binutils linux-headers musl-dev zlib
 
 # set llvm toolchain as default
 ENV CC=clang
@@ -172,6 +174,7 @@ RUN ln -s ${INSTALL_PREFIX}/bin/lld ${INSTALL_PREFIX}/bin/ld
 ENV CFLAGS=""
 ENV CXXFLAGS="-stdlib=libc++"
 ENV LDFLAGS="-rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ -lc++ -lc++abi"
+ENV LIBRARY_PATH="${LIBRARY_PATH}:/usr/local/lib"
 
 # add user mount point
 RUN mkdir -p /project
