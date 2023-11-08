@@ -1,5 +1,5 @@
-ARG ALPINE_VERSION=3.15
-ARG LLVM_VERSION=14.0.6
+ARG ALPINE_VERSION=3.16
+ARG LLVM_VERSION=16.0.0
 ARG PARALLEL_LINK=4
 ARG INSTALL_PREFIX=/usr/local
 ARG LLVM_INSTALL_PATH=${INSTALL_PREFIX}/lib/llvm
@@ -40,6 +40,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DLLVM_PARALLEL_LINK_JOBS=${PARALLEL_LINK} \
         -DLLVM_ENABLE_BINDINGS=OFF \
         -DLLVM_ENABLE_ZLIB=YES \
+        -DLLVM_ENABLE_RTTI=YES \
         -DCOMPILER_RT_BUILD_BUILTINS=ON \
         -DCOMPILER_RT_BUILD_CRT=ON \
         -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
@@ -83,7 +84,7 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DCMAKE_EXE_LINKER_FLAGS="${LDFLAGS}" \
         -DCMAKE_INSTALL_PREFIX=${LLVM_INSTALL_PATH} \
         -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON \
-        -DLLVM_ENABLE_PROJECTS="clang;lld" \
+        -DLLVM_ENABLE_PROJECTS="clang;lld;flang" \
         -DLLVM_ENABLE_RUNTIMES="compiler-rt;libunwind;libcxxabi;libcxx" \
         -DBUILTINS_CMAKE_ARGS="-DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF;-DCMAKE_SHARED_LINKER_FLAGS='${LDFLAGS}';-DCMAKE_MODULE_LINKER_FLAGS='${LDFLAGS}';-DCMAKE_EXE_LINKER_FLAGS='${LDFLAGS}'" \
         -DRUNTIMES_CMAKE_ARGS="-DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF;-DCMAKE_SHARED_LINKER_FLAGS='${LDFLAGS}';-DCMAKE_MODULE_LINKER_FLAGS='${LDFLAGS}';-DCMAKE_EXE_LINKER_FLAGS='${LDFLAGS}'" \
@@ -91,7 +92,6 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DLLVM_ENABLE_LTO=ON \
         -DLLVM_ENABLE_LIBCXX=ON \
         -DLLVM_ENABLE_BINDINGS=OFF \
-        -DLLVM_ENABLE_EH=ON \
         -DLLVM_ENABLE_RTTI=ON \
         -DLLVM_ENABLE_ZLIB=ON \
         -DCOMPILER_RT_BUILD_BUILTINS=ON \
@@ -112,10 +112,43 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DCLANG_DEFAULT_CXX_STDLIB=libc++ \
         -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-alpine-linux-musl  \
         -DLLVM_TARGETS_TO_BUILD="X86" \
-        -DLLVM_DISTRIBUTION_COMPONENTS="clang;LTO;clang-format;clang-resource-headers;lld;builtins;runtimes" \
+        -DLLVM_DISTRIBUTION_COMPONENTS="clang;flang-new;LTO;clang-format;clang-resource-headers;lld;builtins;runtimes" \
     && cmake --build ./build --target install-distribution \
     && rm -rf build
 
+RUN cd ${LLVM_SRC_DIR}/flang/runtime \
+    && cmake -B./build -H. -DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja \
+        -DCMAKE_C_COMPILER=clang \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DLLVM_USE_LINKER=lld \
+        -DCMAKE_SHARED_LINKER_FLAGS="${LDFLAGS}" \
+        -DCMAKE_MODULE_LINKER_FLAGS="${LDFLAGS}" \
+        -DCMAKE_EXE_LINKER_FLAGS="${LDFLAGS}" \
+        -DCMAKE_INSTALL_PREFIX=${LLVM_INSTALL_PATH} \
+        -DLLVM_PARALLEL_LINK_JOBS=${PARALLEL_LINK} \
+        -DLLVM_ENABLE_LTO=ON \
+        -DLLVM_ENABLE_LIBCXX=ON \
+        -DLLVM_ENABLE_RTTI=ON \
+        -DLLVM_TARGETS_TO_BUILD="X86" \
+    && cmake --build ./build --target=install\
+    && rm -rf build
+
+RUN cd ${LLVM_SRC_DIR}/flang/lib/Decimal \
+    && cmake -B./build -H. -DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja \
+        -DCMAKE_C_COMPILER=clang \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DLLVM_USE_LINKER=lld \
+        -DCMAKE_SHARED_LINKER_FLAGS="${LDFLAGS}" \
+        -DCMAKE_MODULE_LINKER_FLAGS="${LDFLAGS}" \
+        -DCMAKE_EXE_LINKER_FLAGS="${LDFLAGS}" \
+        -DCMAKE_INSTALL_PREFIX=${LLVM_INSTALL_PATH} \
+        -DLLVM_PARALLEL_LINK_JOBS=${PARALLEL_LINK} \
+        -DLLVM_ENABLE_LTO=ON \
+        -DLLVM_ENABLE_LIBCXX=ON \
+        -DLLVM_ENABLE_RTTI=ON \
+        -DLLVM_TARGETS_TO_BUILD="X86" \
+    && cmake --build ./build --target=install\
+    && rm -rf build
 
 FROM alpine:${ALPINE_VERSION} AS clang-toolchain
 
@@ -143,3 +176,5 @@ ENV LDFLAGS="-rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ -lc++ -lc++a
 # add user mount point
 RUN mkdir -p /project
 WORKDIR /project
+
+RUN addgroup -S ascenium && adduser -S ascenium -G ascenium
