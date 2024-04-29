@@ -1,5 +1,5 @@
-ARG ALPINE_VERSION=3.18.4
-ARG LLVM_VERSION=17.0.4
+ARG ALPINE_VERSION=3.19.1
+ARG LLVM_VERSION=18.1.4
 ARG PARALLEL_LINK=4
 ARG INSTALL_PREFIX=/usr/local
 ARG LLVM_INSTALL_PATH=${INSTALL_PREFIX}/lib/llvm
@@ -19,7 +19,7 @@ RUN mkdir -p ${LLVM_SRC_DIR} \
 # patch sources (it is also stored in patch directory)
 # see discussion in: https://github.com/llvm/llvm-project/issues/51425
 # NOTE patch from https://github.com/emacski/llvm-project/tree/13.0.0-debian-patches
-RUN curl -L https://github.com/emacski/llvm-project/commit/2fd6a43c9adf6f05936e59a379de236b5d8885b6.diff | patch -ruN --strip=1 -d /llvm_src
+#RUN curl -L https://github.com/emacski/llvm-project/commit/2fd6a43c9adf6f05936e59a379de236b5d8885b6.diff | patch -ruN --strip=1 -d /llvm_src
 
 # documentation: https://llvm.org/docs/BuildingADistribution.html
 
