@@ -114,8 +114,9 @@ RUN cd ${LLVM_SRC_DIR}/ \
         -DCLANG_DEFAULT_CXX_STDLIB=libc++ \
         -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-alpine-linux-musl  \
         -DLLVM_TARGETS_TO_BUILD="X86" \
-        -DLLVM_DISTRIBUTION_COMPONENTS="clang;flang-new;LTO;clang-format;clang-resource-headers;lld;builtins;runtimes" \
-    && cmake --build ./build --target install-distribution \
+        -DLLVM_DISTRIBUTION_COMPONENTS="clang;flang-new;flang-libraries;LTO;clang-format;clang-resource-headers;lld;builtins;runtimes" \
+    && cmake --build ./build --target install-distribution module_files \
+    && cp -r -a ${LLVM_SRC_DIR}/build/include/flang ${LLVM_INSTALL_PATH}/include/ \
     && rm -rf build
 
 RUN cd ${LLVM_SRC_DIR}/flang/runtime \
@@ -162,7 +163,8 @@ COPY --from=builder ${LLVM_INSTALL_PATH} ${LLVM_INSTALL_PATH}
 RUN mkdir -p ${INSTALL_PREFIX}/lib ${INSTALL_PREFIX}/bin ${INSTALL_PREFIX}/include \
     && ln -s ${LLVM_INSTALL_PATH}/bin/*       ${INSTALL_PREFIX}/bin/ \
     && ln -s ${LLVM_INSTALL_PATH}/lib/*       ${INSTALL_PREFIX}/lib/ \
-    && ln -s ${LLVM_INSTALL_PATH}/include/c++ ${INSTALL_PREFIX}/include/
+    && ln -s ${LLVM_INSTALL_PATH}/include/c++ ${INSTALL_PREFIX}/include/ \
+    && ln -s ${LLVM_INSTALL_PATH}/include/flang ${INSTALL_PREFIX}/include/
 RUN apk add --no-cache binutils linux-headers musl-dev zlib
 
 # set llvm toolchain as default
