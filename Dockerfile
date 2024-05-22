@@ -7,7 +7,7 @@ ARG LLVM_INSTALL_PATH=${INSTALL_PREFIX}/lib/llvm
 FROM alpine:${ALPINE_VERSION} AS builder
 
 # install prerequisites
-RUN apk add --no-cache build-base cmake curl git linux-headers ninja python3 wget zlib-dev
+RUN apk add --no-cache build-base cmake curl git linux-headers ninja python3 wget zlib-dev openmp openmp-dev perl
 
 # download sources
 ARG LLVM_VERSION
